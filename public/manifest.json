@@ -1,0 +1,20 @@
+{
+  "manifest_version": 3,
+  "name": "MapTudo",
+  "description": "Mapeia todas as telas de um site e tira prints de página inteira para redesign.",
+  "version": "1.0.0",
+  "icons": { "16": "icons/16.png", "32": "icons/32.png", "48": "icons/48.png", "128": "icons/128.png" },
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "MapTudo",
+    "default_icon": { "16": "icons/16.png", "32": "icons/32.png" }
+  },
+  "background": { "service_worker": "background.js", "type": "module" },
+  "permissions": ["debugger", "tabs", "storage", "unlimitedStorage"],
+  "commands": {
+    "capture-current": {
+      "suggested_key": { "default": "Alt+Shift+S" },
+      "description": "Capturar a tela atual"
+    }
+  }
+}
