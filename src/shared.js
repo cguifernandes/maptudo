@@ -15,6 +15,8 @@ export const DEFAULTS = {
   groupDynamic: true, // /produto/1 e /produto/2 contam como a mesma tela
   ignoreQuery: true, // ?page=2 conta como a mesma tela
   lazyScroll: true, // rola a página antes do print para carregar imagens lazy
+  // modais: 'off' | 'code' (só gatilhos que o HTML/código indicam) | 'all' (testa todo botão)
+  modals: 'off',
   split: true, // exportação: divide prints longos em partes
   exclude: 'logout, signout, sign-out, sair, delete, excluir',
 };

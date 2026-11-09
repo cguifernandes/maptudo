@@ -6,10 +6,18 @@ export const pathOf = url => {
   const u = new URL(url);
   return u.pathname + u.search + u.hash;
 };
-const slug = url => pathOf(url).replace(/[^\w-]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 60) || 'home';
+const clean = text => text.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^\w-]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 60);
+const slug = url => clean(pathOf(url)) || 'home';
 const pad = n => String(n).padStart(3, '0');
+// Nome de uma tela para leitura: "Pedidos" ou "Pedidos (modal: Filtros)"
+export const nameOf = s => {
+  if (s.modal) return `${s.title || pathOf(s.url)} (modal: ${s.modal})`;
+  if (s.via) return `${s.title || pathOf(s.url)} (após clicar em "${s.via}")`;
+  return s.title || '';
+};
+const suffix = s => (s.modal ? `_modal-${clean(s.modal).slice(0, 30)}` : s.via ? `_apos-${clean(s.via).slice(0, 30)}` : '');
 export const fileName = (s, i, part = 0, type = s.blob.type) =>
-  `${pad(i + 1)}_${slug(s.url)}_${s.vp}${part ? `_parte${part}` : ''}.${type === 'image/jpeg' ? 'jpg' : 'png'}`;
+  `${pad(i + 1)}_${slug(s.url)}${suffix(s)}_${s.vp}${part ? `_parte${part}` : ''}.${type === 'image/jpeg' ? 'jpg' : 'png'}`;
 
 export function download(blob, name) {
   const a = Object.assign(document.createElement('a'), { href: URL.createObjectURL(blob), download: name });
@@ -35,7 +43,7 @@ export function sitemapMd(pages, shots = [], names = {}) {
   if (shots.length) {
     out.push('## Telas capturadas', '', '| Arquivo | Tela | Endereço | Tamanho |', '|---|---|---|---|');
     shots.forEach((s, i) => out.push(
-      `| ${(names[s.id] || [fileName(s, i)]).join('<br>')} | ${(s.title || '').replace(/\|/g, '\\|')} | ${pathOf(s.url)} | ${VIEWPORTS[s.vp].label} ${s.width}×${s.height} |`,
+      `| ${(names[s.id] || [fileName(s, i)]).join('<br>')} | ${nameOf(s).replace(/\|/g, '\\|')} | ${pathOf(s.url)} | ${VIEWPORTS[s.vp].label} ${s.width}×${s.height} |`,
     ));
     out.push('');
   }
@@ -43,7 +51,9 @@ export function sitemapMd(pages, shots = [], names = {}) {
     out.push('## Rotas encontradas', '');
     for (const p of orderTree(pages)) {
       const why = WHY[p.status] && ` (${WHY[p.status]}${p.note ? `: ${p.note}` : ''})`;
-      out.push(`${'  '.repeat(p.depth)}- ${pathOf(p.url)}${p.title ? ` — ${p.title}` : ''}${why || ''}`);
+      const modals = (p.via ? ` (aberta pelo botão "${p.via}")` : '') + (p.modals ? ` (+${p.modals} ${p.modals === 1 ? 'modal' : 'modais'})` : '')
+        + (p.states ? ` (+${p.states} após clique)` : '');
+      out.push(`${'  '.repeat(p.depth)}- ${pathOf(p.url)}${p.title ? ` — ${p.title}` : ''}${modals}${why || ''}`);
     }
   }
   return out.join('\n');
@@ -99,7 +109,7 @@ export async function exportPdf(shots, split) {
       const size = [[W, H], W > H ? 'l' : 'p']; // sem a orientação certa o jsPDF troca largura/altura
       if (doc) doc.addPage(...size);
       else doc = new jsPDF({ unit: 'pt', format: size[0], orientation: size[1], compress: true });
-      const label = `${s.title || pathOf(s.url)}  |  ${s.url}  |  ${VIEWPORTS[s.vp].label}${parts.length > 1 ? `  |  parte ${j + 1} de ${parts.length}` : ''}`;
+      const label = `${nameOf(s) || pathOf(s.url)}  |  ${s.url}  |  ${VIEWPORTS[s.vp].label}${parts.length > 1 ? `  |  parte ${j + 1} de ${parts.length}` : ''}`;
       doc.setFontSize(9).setTextColor(90);
       // as fontes padrão do PDF só cobrem Latin-1
       doc.text(doc.splitTextToSize(label.replace(/[^\x20-\xff]/g, ''), W - 20)[0], 10, 17);

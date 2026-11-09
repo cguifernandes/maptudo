@@ -3,3 +3,5 @@ dist/
 # gerados pelo map.js (perfil do Chrome com login salvo e prints)
 .profile/
 prints/
+
+preview/

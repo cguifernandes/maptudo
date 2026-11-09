@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import {
-  AlertDialog, Badge, Box, Button, Callout, Card, CheckboxCards, Flex, Heading, IconButton, Inset,
-  Progress, SegmentedControl, Spinner, Switch, Tabs, Text, TextField, Theme, Tooltip,
+  AlertDialog, Badge, Box, Button, Callout, Card, CheckboxCards, Flex, IconButton, Inset,
+  Progress, Spinner, Switch, Tabs, Text, TextField, Theme, Tooltip,
 } from '@radix-ui/themes';
 import {
   Camera, Check, CircleAlert, CircleDashed, Copy, CornerUpRight, Download, FileArchive, FileText,
-  Globe, Images, Maximize2, Monitor, Play, Smartphone, Square, Tablet, Trash2,
+  Globe, Images, Maximize2, Minus, Monitor, Play, Plus, Smartphone, Square, Tablet, Trash2,
 } from 'lucide-react';
 import '@radix-ui/themes/styles.css';
 import '@fontsource/ibm-plex-sans/latin-400.css';
@@ -14,7 +14,7 @@ import '@fontsource/ibm-plex-sans/latin-500.css';
 import '@fontsource/ibm-plex-sans/latin-600.css';
 import './popup.css';
 import { db, DEFAULTS, VIEWPORTS } from './shared.js';
-import { download, exportPdf, exportZip, fileName, orderTree, pathOf, sitemapMd } from './export.js';
+import { download, exportPdf, exportZip, fileName, nameOf, orderTree, pathOf, sitemapMd } from './export.js';
 
 const params = new URLSearchParams(location.search);
 const isTab = params.has('tab'); // a mesma página serve de popup e de aba cheia
@@ -38,13 +38,11 @@ function useLive(key, initial) {
   return value;
 }
 
-const Logo = () => (
-  <svg width="22" height="22" viewBox="0 0 128 128" aria-hidden="true">
-    <rect width="128" height="128" rx="28" fill="var(--accent-9)" />
-    <rect x="28" y="34" width="54" height="42" rx="7" fill="none" stroke="#fff" strokeOpacity=".55" strokeWidth="8" />
-    <rect x="46" y="52" width="54" height="42" rx="7" fill="var(--accent-9)" stroke="#fff" strokeWidth="8" />
-  </svg>
-);
+const MODALS_HINT = {
+  off: 'Só as telas que têm link. Nenhum botão é clicado.',
+  code: 'Clica só nos botões que o código da página indica que abrem uma modal e tira um print de cada uma.',
+  all: 'Clica em todo botão da tela, inclusive links para fora do site (sem sair dele), e captura o que aparecer: modais, telas que só abrem por um botão e trechos liberados na mesma tela. Um clique pode alterar dados: use em ambiente de teste.',
+};
 
 const Empty = ({ icon: Icon, title, children }) => (
   <div className="empty">
@@ -64,6 +62,53 @@ const Option = ({ title, hint, ...props }) => (
   </label>
 );
 
+// Abas em pílula: uma faixa com respiro em volta e espaço entre os botões
+const Segmented = ({ label, value, onChange, options, disabled, small }) => (
+  <div className={small ? 'seg small' : 'seg'} role="radiogroup" aria-label={label}>
+    {options.map(([v, text]) => (
+      <button key={v} type="button" role="radio" aria-checked={value === v} disabled={disabled} onClick={() => onChange(v)}>{text}</button>
+    ))}
+  </div>
+);
+
+// Um passo da configuração: card com o número e o título
+const Step = ({ n, title, children }) => (
+  <Card size="2" className="step">
+    <Flex align="center" gap="2" mb="3">
+      <span className="num">{n}</span>
+      <Text size="2" weight="bold">{title}</Text>
+    </Flex>
+    {children}
+  </Card>
+);
+
+// Campo numérico com − à esquerda e + à direita. Os botões andam de `step` em `step`
+// (50 → 60 → 70); digitando, vale qualquer número a partir de `min`.
+function Stepper({ label, value, onChange, step, min, unit, disabled }) {
+  const move = dir => onChange(Math.max(min, (dir > 0 ? Math.floor(value / step) + 1 : Math.ceil(value / step) - 1) * step));
+  return (
+    <div className="field" style={{ flex: 1 }}>
+      <Text size="2" weight="medium">{label}</Text>
+      <TextField.Root
+        size="3" className="stepper" inputMode="numeric" aria-label={label} value={value} disabled={disabled}
+        onChange={e => onChange(+e.target.value.replace(/\D/g, ''))} onBlur={() => value < min && onChange(min)}
+      >
+        <TextField.Slot side="left">
+          <IconButton size="2" variant="soft" color="gray" aria-label={`Diminuir ${label.toLowerCase()}`} disabled={disabled || value <= min} onClick={() => move(-1)}>
+            <Minus size={15} />
+          </IconButton>
+        </TextField.Slot>
+        <TextField.Slot side="right">
+          {unit && <Text size="1" color="gray">{unit}</Text>}
+          <IconButton size="2" variant="soft" color="gray" aria-label={`Aumentar ${label.toLowerCase()}`} disabled={disabled} onClick={() => move(1)}>
+            <Plus size={15} />
+          </IconButton>
+        </TextField.Slot>
+      </TextField.Root>
+    </div>
+  );
+}
+
 function Capture({ cfg, setCfg, state, tabId, last, onSee }) {
   const busy = BUSY.includes(state.status);
   const crawling = state.status === 'running' || state.status === 'stopping';
@@ -78,17 +123,17 @@ function Capture({ cfg, setCfg, state, tabId, last, onSee }) {
 
   return (
     <>
-      <div className="scroll">
-        <label className="field">
-          <Text size="2" weight="medium">Onde começar</Text>
-          <TextField.Root placeholder="localhost:3000" value={cfg.url} disabled={busy} onChange={e => setCfg({ url: e.target.value })}>
-            <TextField.Slot><Globe size={15} /></TextField.Slot>
-          </TextField.Root>
-          <Text size="1" color="gray">Entre na sua conta antes, se o site pedir. O mapeamento segue os links internos a partir daqui.</Text>
-        </label>
+      <div className="scroll steps">
+        <Step n={1} title="Onde começar">
+          <div className="field">
+            <TextField.Root aria-label="Onde começar" placeholder="localhost:3000" value={cfg.url} disabled={busy} onChange={e => setCfg({ url: e.target.value })}>
+              <TextField.Slot><Globe size={15} /></TextField.Slot>
+            </TextField.Root>
+            <Text size="1" color="gray">Entre na sua conta antes, se o site pedir. O mapeamento segue os links internos a partir daqui.</Text>
+          </div>
+        </Step>
 
-        <div className="field">
-          <Text size="2" weight="medium">Tamanhos de tela</Text>
+        <Step n={2} title="Tamanho da tela">
           <CheckboxCards.Root
             size="1" columns="3" gap="2" value={cfg.viewports}
             onValueChange={v => v.length && setCfg({ viewports: Object.keys(VIEWPORTS).filter(k => v.includes(k)) })}
@@ -100,46 +145,49 @@ function Capture({ cfg, setCfg, state, tabId, last, onSee }) {
                   <Flex direction="column" gap="1">
                     <Icon size={16} />
                     <Text size="2" weight="medium">{v.label}</Text>
-                    <Text size="1" color="gray">{v.width} × {v.height}</Text>
+                    <Text size="1" color="gray" wrap="nowrap">{v.width} × {v.height}</Text>
                   </Flex>
                 </CheckboxCards.Item>
               );
             })}
           </CheckboxCards.Root>
-        </div>
+        </Step>
 
-        <Flex gap="3">
-          <label className="field" style={{ flex: 1 }}>
-            <Text size="2" weight="medium">Máximo de telas</Text>
-            <TextField.Root type="number" min="1" value={cfg.maxPages} disabled={busy} onChange={e => setCfg({ maxPages: +e.target.value })} />
+        <Step n={3} title="Captura">
+          <Flex gap="3">
+            <Stepper label="Máximo de telas" value={cfg.maxPages} step={10} min={1} disabled={busy} onChange={maxPages => setCfg({ maxPages })} />
+            <Stepper label="Espera por tela" value={cfg.delay} step={100} min={0} unit="ms" disabled={busy} onChange={delay => setCfg({ delay })} />
+          </Flex>
+          <div className="field">
+            <Text size="2" weight="medium">Formato do print</Text>
+            <Segmented
+              label="Formato do print" value={cfg.format} disabled={busy} onChange={format => setCfg({ format })}
+              options={[['png', 'PNG, sem perda'], ['jpeg', 'JPEG, mais leve']]}
+            />
+          </div>
+          <div>
+            <Option title="Rolar a página antes do print" hint="Carrega imagens que só aparecem ao rolar" disabled={busy} checked={cfg.lazyScroll} onCheckedChange={lazyScroll => setCfg({ lazyScroll })} />
+          </div>
+        </Step>
+
+        <Step n={4} title="Regras de navegação">
+          <div className="field">
+            <Text size="2" weight="medium">Botões e modais</Text>
+            <Segmented
+              label="Botões e modais" value={cfg.modals} disabled={busy} onChange={modals => setCfg({ modals })}
+              options={[['off', 'Não clicar'], ['code', 'Só modais'], ['all', 'Testar botões']]}
+            />
+            <Text size="1" color={cfg.modals === 'all' ? 'amber' : 'gray'}>{MODALS_HINT[cfg.modals]}</Text>
+          </div>
+          <div>
+            <Option title="Agrupar telas repetidas" hint="/produto/1 e /produto/2 viram uma tela só" disabled={busy} checked={cfg.groupDynamic} onCheckedChange={groupDynamic => setCfg({ groupDynamic })} />
+            <Option title="Ignorar filtros e paginação" hint="?page=2 conta como a mesma tela" disabled={busy} checked={cfg.ignoreQuery} onCheckedChange={ignoreQuery => setCfg({ ignoreQuery })} />
+          </div>
+          <label className="field" style={{ marginTop: 12 }}>
+            <Text size="2" weight="medium">Não visitar endereços que contenham</Text>
+            <TextField.Root value={cfg.exclude} disabled={busy} onChange={e => setCfg({ exclude: e.target.value })} />
           </label>
-          <label className="field" style={{ flex: 1 }}>
-            <Text size="2" weight="medium">Espera por tela</Text>
-            <TextField.Root type="number" min="0" step="100" value={cfg.delay} disabled={busy} onChange={e => setCfg({ delay: +e.target.value })}>
-              <TextField.Slot side="right">ms</TextField.Slot>
-            </TextField.Root>
-          </label>
-        </Flex>
-
-        <div className="field">
-          <Text size="2" weight="medium">Formato do print</Text>
-          <SegmentedControl.Root value={cfg.format} disabled={busy} onValueChange={format => setCfg({ format })}>
-            <SegmentedControl.Item value="png">PNG, sem perda</SegmentedControl.Item>
-            <SegmentedControl.Item value="jpeg">JPEG, mais leve</SegmentedControl.Item>
-          </SegmentedControl.Root>
-        </div>
-
-        <div>
-          <Option title="Agrupar telas repetidas" hint="/produto/1 e /produto/2 viram uma tela só" disabled={busy} checked={cfg.groupDynamic} onCheckedChange={groupDynamic => setCfg({ groupDynamic })} />
-          <Option title="Ignorar filtros e paginação" hint="?page=2 conta como a mesma tela" disabled={busy} checked={cfg.ignoreQuery} onCheckedChange={ignoreQuery => setCfg({ ignoreQuery })} />
-          <Option title="Rolar a página antes do print" hint="Carrega imagens que só aparecem ao rolar" disabled={busy} checked={cfg.lazyScroll} onCheckedChange={lazyScroll => setCfg({ lazyScroll })} />
-        </div>
-
-        <label className="field" style={{ marginTop: 16, marginBottom: 0 }}>
-          <Text size="2" weight="medium">Não visitar endereços que contenham</Text>
-          <TextField.Root value={cfg.exclude} disabled={busy} onChange={e => setCfg({ exclude: e.target.value })} />
-          <Text size="1" color="gray">O mapeamento abre todo link que encontra. Deixe aqui os que mudam alguma coisa, como sair ou excluir.</Text>
-        </label>
+        </Step>
       </div>
 
       <div className="bar">
@@ -154,7 +202,9 @@ function Capture({ cfg, setCfg, state, tabId, last, onSee }) {
             {last ? <img src={last.thumb} alt="" /> : <div className="blank" />}
             <Box flexGrow="1" minWidth="0">
               <Text as="div" size="2" weight="medium">Mapeando tela {Math.min(done + 1, total)} de {total}</Text>
-              <Text as="div" size="1" color="gray" truncate>{state.current ? pathOf(state.current) : 'Preparando'}</Text>
+              <Text as="div" size="1" color="gray" truncate>
+                {!state.current ? 'Preparando' : state.phase === 'modals' ? `Abrindo modais em ${pathOf(state.current)}` : pathOf(state.current)}
+              </Text>
               <Progress size="1" mt="2" value={(done / total) * 100} />
             </Box>
             <Button color="gray" variant="soft" disabled={state.status === 'stopping'} onClick={() => chrome.runtime.sendMessage({ cmd: 'stop' })}>
@@ -198,14 +248,16 @@ function ShotCard({ shot, index, onDelete }) {
     <Card size="1" className="shot">
       <Inset side="top" clip="padding-box" pb="current">
         <a href={`popup.html?view=${shot.id}`} target="_blank" rel="noreferrer" title="Abrir em tamanho real">
-          <img className="thumb" src={shot.thumb} alt="" />
+          <img className="thumb" src={shot.thumb} alt="" style={shot.modal ? { objectPosition: 'center' } : undefined} />
         </a>
       </Inset>
-      <Text as="div" size="2" weight="medium" truncate>{shot.title || pathOf(shot.url)}</Text>
-      <Text as="div" size="1" color="gray" truncate>{pathOf(shot.url)}</Text>
+      <Text as="div" size="2" weight="medium" truncate>{shot.modal || shot.title || pathOf(shot.url)}</Text>
+      <Text as="div" size="1" color="gray" truncate>{shot.via ? `Após clicar em "${shot.via}"` : pathOf(shot.url)}</Text>
       <Flex justify="between" align="center" mt="2">
         <Flex gap="1">
           <Badge color="gray">{VIEWPORTS[shot.vp].label}</Badge>
+          {shot.modal && <Badge>modal</Badge>}
+          {shot.via && <Badge>botão</Badge>}
           {shot.manual && <Badge color="amber">manual</Badge>}
         </Flex>
         <Flex gap="3" className="actions">
@@ -256,10 +308,7 @@ function Shots({ shots, pages, cfg, setCfg, reload }) {
         <Flex justify="between" align="center" mb="3" gap="3">
           <Text size="2" color="gray">{plural(list.length, 'tela', 'telas')}, {mb(list.reduce((n, s) => n + s.blob.size, 0))}</Text>
           {sizes.length > 1 && (
-            <SegmentedControl.Root size="1" value={active} onValueChange={setFilter}>
-              <SegmentedControl.Item value="all">Todas</SegmentedControl.Item>
-              {sizes.map(k => <SegmentedControl.Item key={k} value={k}>{VIEWPORTS[k].label}</SegmentedControl.Item>)}
-            </SegmentedControl.Root>
+            <Segmented small label="Tamanho" value={active} onChange={setFilter} options={[['all', 'Todas'], ...sizes.map(k => [k, VIEWPORTS[k].label])]} />
           )}
         </Flex>
         <div className="grid">
@@ -345,7 +394,7 @@ function RouteMap({ pages }) {
             {Array.from({ length: p.depth }, (_, d) => <span key={d} className="guide" />)}
             {STATUS[p.status]}
             <span className="path">{pathOf(p.url)}</span>
-            <span className="rest">{p.note || p.title}</span>
+            <span className="rest">{p.note || p.title}{p.via && `, pelo botão "${p.via}"`}{p.modals > 0 && `, ${plural(p.modals, 'modal', 'modais')}`}{p.states > 0 && `, ${p.states} após clique`}</span>
           </a>
         ))}
       </div>
@@ -382,19 +431,13 @@ function App() {
 
   return (
     <div className="app">
-      <header className="top">
-        <Flex align="center" gap="2">
-          <Logo />
-          <Heading size="3" weight="medium">MapTudo</Heading>
-        </Flex>
-        {!isTab && (
-          <Tooltip content="Abrir em uma aba">
-            <IconButton variant="ghost" color="gray" aria-label="Abrir em uma aba" onClick={() => chrome.tabs.create({ url: 'popup.html?tab' })}>
-              <Maximize2 size={15} />
-            </IconButton>
-          </Tooltip>
-        )}
-      </header>
+      {!isTab && (
+        <Tooltip content="Abrir em uma aba">
+          <IconButton className="expand" variant="ghost" color="gray" aria-label="Abrir em uma aba" onClick={() => chrome.tabs.create({ url: 'popup.html?tab' })}>
+            <Maximize2 size={15} />
+          </IconButton>
+        </Tooltip>
+      )}
       <Tabs.Root className="tabs" value={tab} onValueChange={setTab}>
         <Tabs.List>
           <Tabs.Trigger value="capture">Capturar</Tabs.Trigger>
@@ -426,7 +469,7 @@ function Viewer({ id }) {
     <div className="viewer">
       <header>
         <Box flexGrow="1" minWidth="0">
-          <Text as="div" size="2" weight="medium" truncate>{shot.title || pathOf(shot.url)}</Text>
+          <Text as="div" size="2" weight="medium" truncate>{nameOf(shot) || pathOf(shot.url)}</Text>
           <Text as="div" size="1" color="gray" truncate>{shot.url}</Text>
         </Box>
         <Badge color="gray">{vp.label} {shot.width} × {shot.height}</Badge>
@@ -441,7 +484,7 @@ function Viewer({ id }) {
 
 if (isTab || params.has('view')) document.body.classList.add('tab');
 createRoot(document.getElementById('root')).render(
-  <Theme accentColor="jade" grayColor="sage" radius="medium" appearance={matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'}>
+  <Theme accentColor="lime" grayColor="olive" radius="medium" panelBackground="solid" appearance={matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'}>
     {params.has('view') ? <Viewer id={+params.get('view')} /> : <App />}
   </Theme>,
 );

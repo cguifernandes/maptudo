@@ -6,17 +6,51 @@ body.tab { width: auto; height: 100vh; }
   --default-font-family: 'IBM Plex Sans', system-ui, sans-serif;
   --heading-font-family: 'IBM Plex Sans', system-ui, sans-serif;
   --strong-font-family: 'IBM Plex Sans', system-ui, sans-serif;
+  /* cor de destaque: lime-400 e lime-500 do Tailwind no lugar do lime mais pálido do Radix */
+  --lime-9: #a3e635;
+  --lime-10: #84cc16;
+  /* o Radix usa a seta padrão em tudo que é clicável; aqui é a mãozinha */
+  --cursor-button: pointer;
+  --cursor-checkbox: pointer;
+  --cursor-switch: pointer;
+  --cursor-radio: pointer;
+  --cursor-menu-item: pointer;
 }
+.rt-TabsTrigger, .rt-CheckboxCardsItem, .rt-BaseButton { cursor: pointer; }
+:disabled, [data-disabled] { cursor: not-allowed; }
 
-.app { display: flex; flex-direction: column; height: 100vh; max-width: 1080px; margin: 0 auto; }
-.top { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px 6px; }
+.app { position: relative; display: flex; flex-direction: column; height: 100vh; max-width: 1080px; margin: 0 auto; }
+.expand { position: absolute; top: 12px; right: 16px; z-index: 1; }
 .tabs, .pane { flex: 1; min-height: 0; display: flex; flex-direction: column; }
-.tabs > .rt-TabsList { padding: 0 8px; flex: none; }
+.tabs > .rt-TabsList { padding: 4px 8px 0; flex: none; }
 .pane[hidden] { display: none; }
 .scroll { flex: 1; min-height: 0; overflow-y: auto; padding: 16px; scrollbar-width: thin; scrollbar-color: var(--gray-a6) transparent; }
 .bar { flex: none; padding: 12px 16px 14px; border-top: 1px solid var(--gray-a4); background: var(--color-panel-solid); }
 
+/* Passos da configuração: um card por passo, com o número na frente do título */
+.steps { display: flex; flex-direction: column; gap: 12px; }
+.steps > .step { flex: none; }
+.step .num { display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; border-radius: 50%; background: var(--accent-9); color: var(--accent-contrast); font-size: 12px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.step .field:last-child { margin-bottom: 0; }
+
+/* Tamanhos de tela: o selecionado ganha a borda na cor de destaque e o checkbox fica no canto de cima */
+.step .rt-CheckboxCardsItem { --checkbox-cards-item-padding-right: var(--checkbox-cards-item-padding-left); }
+.step .rt-CheckboxCardCheckbox { top: var(--checkbox-cards-item-padding-top); }
+.step .rt-CheckboxCardsItem:has([data-state='checked'])::after { box-shadow: 0 0 0 2px var(--accent-9); }
+
+/* Abas em pílula (formato do print, modais, filtro da galeria) */
+.seg { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 4px; padding: 4px; border-radius: var(--radius-3); background: var(--gray-a3); }
+.seg button { all: unset; box-sizing: border-box; height: 32px; padding: 0 10px; border-radius: var(--radius-2); text-align: center; white-space: nowrap; font-size: 13px; color: var(--gray-11); cursor: pointer; transition: background-color 0.12s; }
+.seg button:hover { background: var(--gray-a3); }
+.seg button[aria-checked='true'] { background: var(--color-background); color: var(--gray-12); font-weight: 500; box-shadow: 0 0 0 1px var(--gray-a4), 0 1px 2px var(--gray-a4); }
+.dark .seg button[aria-checked='true'] { background: var(--gray-a5); }
+.seg button:focus-visible { outline: 2px solid var(--focus-8); outline-offset: 1px; }
+.seg button:disabled { cursor: not-allowed; opacity: 0.6; }
+.seg.small { padding: 3px; gap: 3px; }
+.seg.small button { height: 24px; font-size: 12px; }
+
 .field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 16px; }
+.stepper .rt-TextFieldInput { text-align: center; font-variant-numeric: tabular-nums; }
 .option { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; padding: 9px 0; border-top: 1px solid var(--gray-a3); cursor: pointer; }
 .option:first-child { border-top: 0; }
 
